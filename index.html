@@ -1,115 +1,374 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HotelOps Weekly Manager</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HotelOps • Weekly Manager (MVP)</title>
+  <!-- Tailwind via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- jsPDF + AutoTable for pretty tables in PDFs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    /* Minimal focus styles */
+    :focus { outline: 2px solid #60a5fa; outline-offset: 2px; }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 p-6">
-  <h1 class="text-2xl font-bold text-center mb-6">HotelOps Weekly Manager</h1>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-6xl mx-auto p-5">
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <h1 class="text-2xl md:text-3xl font-bold tracking-tight">HotelOps • Weekly Manager</h1>
+      <div class="flex items-center gap-2 text-sm">
+        <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700">MVP</span>
+        <a class="hidden sm:inline text-blue-700 hover:underline" href="#" onclick="exportPDF()">Export PDF</a>
+      </div>
+    </header>
 
-  <!-- Tabs -->
-  <div class="flex justify-center mb-4 space-x-4">
-    <button id="tabMetrics" class="px-4 py-2 bg-blue-600 text-white rounded">Weekly Metrics</button>
-    <button id="tabSchedule" class="px-4 py-2 bg-gray-200 rounded">Employee Schedule</button>
-  </div>
+    <!-- Week controls -->
+    <section class="mt-4 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p class="text-sm text-slate-500">Current Week (Fri → Thu)</p>
+          <h2 id="weekLabel" class="text-lg font-semibold">—</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="prevWeek" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300">◀ Prev</button>
+          <button id="nextWeek" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300">Next ▶</button>
+          <input id="weekStart" type="date" class="px-3 py-2 rounded-lg border border-slate-300" />
+          <button id="goWeek" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Go</button>
+        </div>
+      </div>
+    </section>
 
-  <!-- Weekly Metrics -->
-  <div id="metricsTab" class="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-semibold mb-4">Enter Weekly Metrics</h2>
-    <form id="metricsForm" class="space-y-3">
-      <input type="number" id="roomsSold" placeholder="Rooms Sold" class="w-full border p-2 rounded">
-      <input type="number" id="adr" placeholder="ADR ($)" class="w-full border p-2 rounded">
-      <input type="number" id="occupancy" placeholder="Occupancy (%)" class="w-full border p-2 rounded">
-      <p id="revenueDisplay" class="font-medium mt-3">Revenue: $0.00</p>
-    </form>
-  </div>
+    <!-- Tabs -->
+    <nav class="mt-4 flex gap-2">
+      <button id="tab-metrics" class="tab-btn px-4 py-2 rounded-lg bg-blue-600 text-white">Weekly Metrics</button>
+      <button id="tab-schedule" class="tab-btn px-4 py-2 rounded-lg bg-slate-200">Employee Schedule</button>
+    </nav>
 
-  <!-- Schedule -->
-  <div id="scheduleTab" class="hidden max-w-3xl mx-auto bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-semibold mb-4">Employee Schedule</h2>
-    <div id="scheduleContainer" class="overflow-x-auto">
-      <table class="w-full text-sm border">
-        <thead class="bg-gray-100">
-          <tr>
-            <th class="border p-2">Day</th>
-            <th class="border p-2">Front Desk</th>
-            <th class="border p-2">Housekeeping</th>
-            <th class="border p-2">Maintenance</th>
-            <th class="border p-2">F&B</th>
-          </tr>
-        </thead>
-        <tbody id="scheduleBody"></tbody>
-      </table>
-    </div>
-    <button id="pdfBtn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Download PDF</button>
+    <!-- Panels -->
+    <main class="mt-4 grid gap-4">
+      <!-- Metrics Panel -->
+      <section id="panel-metrics" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <h3 class="text-xl font-semibold mb-4">Weekly Performance</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label class="text-sm text-slate-600">Rooms Sold</label>
+            <input id="roomsSold" type="number" min="0" step="1" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" placeholder="e.g. 420" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-600">ADR ($)</label>
+            <input id="adr" type="number" min="0" step="0.01" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" placeholder="e.g. 125.50" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-600">Occupancy (%)</label>
+            <input id="occupancy" type="number" min="0" max="100" step="0.1" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300" placeholder="e.g. 68.5" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-600">Revenue (auto)</label>
+            <div id="revenueBox" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50">$0.00</div>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <button id="clearMetrics" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">Clear</button>
+          <span id="savedFlash" class="text-sm text-emerald-600 hidden">Saved ✓</span>
+        </div>
+      </section>
+
+      <!-- Schedule Panel -->
+      <section id="panel-schedule" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xl font-semibold">Employee Schedule</h3>
+          <button onclick="exportPDF()" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Export PDF</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border border-slate-200">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="border p-2 text-left">Day</th>
+                <th class="border p-2 text-left">Front Desk</th>
+                <th class="border p-2 text-left">Housekeeping</th>
+                <th class="border p-2 text-left">Maintenance</th>
+                <th class="border p-2 text-left">F&amp;B</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleBody"></tbody>
+          </table>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <button id="clearSchedule" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">Clear</button>
+          <span id="savedFlashSched" class="text-sm text-emerald-600 hidden">Saved ✓</span>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script>
+    // ---------- Utilities ----------
+    const fmtUSD = (n) => `$${(n ?? 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    function addDays(d, days) { const nd = new Date(d); nd.setDate(nd.getDate() + days); return nd; }
+    function toISODate(d) { const z = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); return z.toISOString().slice(0,10); }
+    function prettyMD(d) { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric'}); }
+
+    // Week = Friday -> Thursday
+    function getWeekFromFriday(friDate) {
+      const start = new Date(friDate.getFullYear(), friDate.getMonth(), friDate.getDate());
+      const end = addDays(start, 6); // Thu
+      return { start, end };
+    }
+
+    // Next Friday from "today"
+    function nextFriday(base = new Date()) {
+      const day = base.getDay(); // 0=Sun .. 6=Sat
+      const diff = (5 - day + 7) % 7; // 5 = Friday
+      const target = addDays(base, diff === 0 && base.getHours() >= 0 ? 7 : diff); // if today is Fri, treat NEXT Fri
+      // If today is before Friday in the same week, we want the upcoming Friday (as per your example 11/12 → 11/14)
+      if (diff !== 0) return target;
+      // If it's already Friday, we still treat this as the current week's Friday
+      return base;
+    }
+
+    function storageKey(range){
+      return `hotelops_${toISODate(range.start)}_${toISODate(range.end)}`;
+    }
+
+    // ---------- State ----------
+    let currentWeek = null; // {start:Date, end:Date}
+
     const days = ["Friday","Saturday","Sunday","Monday","Tuesday","Wednesday","Thursday"];
+    const departments = ["Front Desk","Housekeeping","Maintenance","F&B"];
+
+    // ---------- DOM ----------
+    const weekLabelEl = document.getElementById('weekLabel');
+    const weekStartInput = document.getElementById('weekStart');
+    const prevWeekBtn = document.getElementById('prevWeek');
+    const nextWeekBtn = document.getElementById('nextWeek');
+    const goWeekBtn = document.getElementById('goWeek');
+
+    const roomsSoldEl = document.getElementById('roomsSold');
+    const adrEl = document.getElementById('adr');
+    const occEl = document.getElementById('occupancy');
+    const revenueBoxEl = document.getElementById('revenueBox');
+    const savedFlash = document.getElementById('savedFlash');
+
     const scheduleBody = document.getElementById('scheduleBody');
-    days.forEach(day=>{
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="border p-2 font-medium">${day}</td>
-        ${["Front Desk","Housekeeping","Maintenance","F&B"].map(d =>
-          `<td class='border p-1'><input class='w-full p-1 border rounded' placeholder='Names'></td>`
-        ).join('')}
-      `;
-      scheduleBody.appendChild(row);
-    });
+    const savedFlashSched = document.getElementById('savedFlashSched');
 
-    // Tabs toggle
-    const metricsTab = document.getElementById('metricsTab');
-    const scheduleTab = document.getElementById('scheduleTab');
-    document.getElementById('tabMetrics').onclick = () => {
-      metricsTab.classList.remove('hidden');
-      scheduleTab.classList.add('hidden');
-      document.getElementById('tabMetrics').classList.replace('bg-gray-200','bg-blue-600');
-      document.getElementById('tabMetrics').classList.replace('text-gray-800','text-white');
-      document.getElementById('tabSchedule').classList.replace('bg-blue-600','bg-gray-200');
-      document.getElementById('tabSchedule').classList.replace('text-white','text-gray-800');
-    };
-    document.getElementById('tabSchedule').onclick = () => {
-      metricsTab.classList.add('hidden');
-      scheduleTab.classList.remove('hidden');
-      document.getElementById('tabSchedule').classList.replace('bg-gray-200','bg-blue-600');
-      document.getElementById('tabSchedule').classList.replace('text-gray-800','text-white');
-      document.getElementById('tabMetrics').classList.replace('bg-blue-600','bg-gray-200');
-      document.getElementById('tabMetrics').classList.replace('text-white','text-gray-800');
-    };
+    // Tabs
+    const tabMetrics = document.getElementById('tab-metrics');
+    const tabSchedule = document.getElementById('tab-schedule');
+    const panelMetrics = document.getElementById('panel-metrics');
+    const panelSchedule = document.getElementById('panel-schedule');
 
-    // Revenue calculation
-    document.querySelectorAll('#roomsSold, #adr').forEach(el=>{
-      el.addEventListener('input',()=>{
-        const rooms = parseFloat(document.getElementById('roomsSold').value) || 0;
-        const adr = parseFloat(document.getElementById('adr').value) || 0;
-        const revenue = rooms * adr;
-        document.getElementById('revenueDisplay').innerText = `Revenue: $${revenue.toFixed(2)}`;
+    tabMetrics.addEventListener('click', () => selectTab('metrics'));
+    tabSchedule.addEventListener('click', () => selectTab('schedule'));
+
+    function selectTab(which){
+      const active = which === 'metrics';
+      panelMetrics.classList.toggle('hidden', !active);
+      panelSchedule.classList.toggle('hidden', active);
+      tabMetrics.classList.toggle('bg-blue-600', active);
+      tabMetrics.classList.toggle('text-white', active);
+      tabMetrics.classList.toggle('bg-slate-200', !active);
+      tabSchedule.classList.toggle('bg-blue-600', !active);
+      tabSchedule.classList.toggle('text-white', !active);
+      tabSchedule.classList.toggle('bg-slate-200', active);
+    }
+
+    // ---------- Schedule table build ----------
+    function buildScheduleInputs(){
+      scheduleBody.innerHTML = '';
+      days.forEach((day, rowIdx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="border p-2 font-medium">${day}</td>
+          ${departments.map((d, colIdx) => (
+            `<td class="border p-0">
+              <textarea data-day="${rowIdx}" data-dept="${colIdx}" class="w-full min-h-[48px] p-2 resize-y outline-none" placeholder="Names / shifts (e.g., Ana 7a-3p, Ben 3p-11p)"></textarea>
+            </td>`
+          )).join('')}
+        `;
+        scheduleBody.appendChild(tr);
       });
+
+      scheduleBody.querySelectorAll('textarea').forEach(t => {
+        t.addEventListener('input', debounce(saveSchedule, 300));
+      });
+    }
+
+    // ---------- Revenue calc + persistence ----------
+    function computeRevenue(){
+      const rooms = Number(roomsSoldEl.value || 0);
+      const adr = Number(adrEl.value || 0);
+      const revenue = rooms * adr;
+      revenueBoxEl.textContent = fmtUSD(revenue);
+      return revenue;
+    }
+
+    function saveMetrics(){
+      if(!currentWeek) return;
+      const key = storageKey(currentWeek);
+      const data = JSON.parse(localStorage.getItem(key) || '{}');
+      data.metrics = {
+        roomsSold: roomsSoldEl.value || '',
+        adr: adrEl.value || '',
+        occupancy: occEl.value || '',
+        revenue: computeRevenue()
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      flash(savedFlash);
+    }
+
+    function loadMetrics(){
+      if(!currentWeek) return;
+      const key = storageKey(currentWeek);
+      const data = JSON.parse(localStorage.getItem(key) || '{}');
+      const m = data.metrics || {};
+      roomsSoldEl.value = m.roomsSold || '';
+      adrEl.value = m.adr || '';
+      occEl.value = m.occupancy || '';
+      computeRevenue();
+    }
+
+    roomsSoldEl.addEventListener('input', debounce(saveMetrics, 200));
+    adrEl.addEventListener('input', debounce(saveMetrics, 200));
+    occEl.addEventListener('input', debounce(saveMetrics, 200));
+
+    document.getElementById('clearMetrics').addEventListener('click', () => {
+      roomsSoldEl.value = '';
+      adrEl.value = '';
+      occEl.value = '';
+      computeRevenue();
+      saveMetrics();
     });
 
-    // PDF Export
-    document.getElementById('pdfBtn').onclick = () => {
+    // ---------- Schedule persistence ----------
+    function saveSchedule(){
+      if(!currentWeek) return;
+      const key = storageKey(currentWeek);
+      const data = JSON.parse(localStorage.getItem(key) || '{}');
+      const entries = [];
+      scheduleBody.querySelectorAll('textarea').forEach(t => {
+        entries.push({ day: Number(t.dataset.day), dept: Number(t.dataset.dept), value: t.value });
+      });
+      data.schedule = entries;
+      localStorage.setItem(key, JSON.stringify(data));
+      flash(savedFlashSched);
+    }
+
+    function loadSchedule(){
+      if(!currentWeek) return;
+      const key = storageKey(currentWeek);
+      const data = JSON.parse(localStorage.getItem(key) || '{}');
+      (data.schedule || []).forEach(item => {
+        const t = scheduleBody.querySelector(`textarea[data-day="${item.day}"][data-dept="${item.dept}"]`);
+        if (t) t.value = item.value;
+      });
+    }
+
+    // ---------- Week switching ----------
+    function updateWeekLabel(){
+      weekLabelEl.textContent = `${prettyMD(currentWeek.start)} – ${prettyMD(currentWeek.end)}`;
+      weekStartInput.value = toISODate(currentWeek.start);
+    }
+
+    function setWeekByFridayDate(d){
+      currentWeek = getWeekFromFriday(d);
+      updateWeekLabel();
+      buildScheduleInputs();
+      loadMetrics();
+      loadSchedule();
+    }
+
+    prevWeekBtn.addEventListener('click', () => {
+      const prevFri = addDays(currentWeek.start, -7);
+      setWeekByFridayDate(prevFri);
+    });
+
+    nextWeekBtn.addEventListener('click', () => {
+      const nextFri = addDays(currentWeek.start, 7);
+      setWeekByFridayDate(nextFri);
+    });
+
+    goWeekBtn.addEventListener('click', () => {
+      const d = weekStartInput.value ? new Date(weekStartInput.value + 'T00:00:00') : new Date();
+      // Ensure provided date is a Friday, otherwise find the next Friday after it
+      const day = d.getDay();
+      const diff = (5 - day + 7) % 7; // 5 = Friday
+      const friday = addDays(d, diff);
+      setWeekByFridayDate(friday);
+    });
+
+    // ---------- PDF ----------
+    async function exportPDF(){
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const revenue = document.getElementById('revenueDisplay').innerText;
-      doc.text("HotelOps Weekly Summary", 10, 10);
-      doc.text(revenue, 10, 20);
-      doc.text("Schedule:", 10, 30);
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
 
-      let y = 40;
-      const rows = scheduleBody.querySelectorAll('tr');
-      rows.forEach(r=>{
-        const cells = [...r.querySelectorAll('td')].map(td => td.querySelector('input')?.value || td.innerText);
-        doc.text(cells.join(" | "), 10, y);
-        y += 8;
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('HotelOps • Weekly Summary', 40, 40);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text(`Week: ${prettyMD(currentWeek.start)} – ${prettyMD(currentWeek.end)}`, 40, 60);
+
+      // Metrics
+      const rooms = roomsSoldEl.value || '—';
+      const adr = adrEl.value ? `$${Number(adrEl.value).toFixed(2)}` : '—';
+      const occ = occEl.value ? `${Number(occEl.value).toFixed(1)}%` : '—';
+      const revenueTxt = revenueBoxEl.textContent || '$0.00';
+
+      doc.autoTable({
+        startY: 80,
+        theme: 'grid',
+        head: [['Rooms Sold', 'ADR', 'Occupancy %', 'Revenue']],
+        body: [[rooms, adr, occ, revenueTxt]],
+        styles: { fontSize: 11 },
+        headStyles: { fillColor: [30, 64, 175] }, // blue-800
       });
 
-      doc.save("HotelOps_Weekly_Summary.pdf");
-    };
+      // Schedule table
+      const schedData = [];
+      scheduleBody.querySelectorAll('tr').forEach((tr, rIdx) => {
+        const tds = Array.from(tr.querySelectorAll('td'));
+        const day = tds[0].innerText;
+        const vals = tds.slice(1).map(td => (td.querySelector('textarea')?.value || '').trim());
+        schedData.push([day, ...vals]);
+      });
+
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 20,
+        theme: 'grid',
+        head: [['Day', ...departments]],
+        body: schedData,
+        styles: { fontSize: 10, cellPadding: 4 },
+        headStyles: { fillColor: [30, 64, 175] },
+        columnStyles: { 0: { cellWidth: 80 } }
+      });
+
+      doc.save(`HotelOps_${toISODate(currentWeek.start)}_${toISODate(currentWeek.end)}.pdf`);
+    }
+
+    window.exportPDF = exportPDF; // expose for header link
+
+    // ---------- helpers ----------
+    function debounce(fn, t){
+      let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), t); };
+    }
+    function flash(el){ el.classList.remove('hidden'); setTimeout(() => el.classList.add('hidden'), 900); }
+
+    // ---------- Init ----------
+    (function init(){
+      // Default to the upcoming Friday from today (per your example 11/12 ➜ 11/14)
+      const today = new Date();
+      const day = today.getDay();
+      const toNext = (5 - day + 7) % 7; // Friday index 5
+      const defaultFri = addDays(today, toNext || 0);
+      setWeekByFridayDate(defaultFri);
+      selectTab('metrics');
+    })();
   </script>
 </body>
 </html>
