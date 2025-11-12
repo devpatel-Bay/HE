@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HotelOps Weekly Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-6">
+  <h1 class="text-2xl font-bold text-center mb-6">HotelOps Weekly Manager</h1>
+
+  <!-- Tabs -->
+  <div class="flex justify-center mb-4 space-x-4">
+    <button id="tabMetrics" class="px-4 py-2 bg-blue-600 text-white rounded">Weekly Metrics</button>
+    <button id="tabSchedule" class="px-4 py-2 bg-gray-200 rounded">Employee Schedule</button>
+  </div>
+
+  <!-- Weekly Metrics -->
+  <div id="metricsTab" class="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
+    <h2 class="text-xl font-semibold mb-4">Enter Weekly Metrics</h2>
+    <form id="metricsForm" class="space-y-3">
+      <input type="number" id="roomsSold" placeholder="Rooms Sold" class="w-full border p-2 rounded">
+      <input type="number" id="adr" placeholder="ADR ($)" class="w-full border p-2 rounded">
+      <input type="number" id="occupancy" placeholder="Occupancy (%)" class="w-full border p-2 rounded">
+      <p id="revenueDisplay" class="font-medium mt-3">Revenue: $0.00</p>
+    </form>
+  </div>
+
+  <!-- Schedule -->
+  <div id="scheduleTab" class="hidden max-w-3xl mx-auto bg-white p-6 rounded-lg shadow">
+    <h2 class="text-xl font-semibold mb-4">Employee Schedule</h2>
+    <div id="scheduleContainer" class="overflow-x-auto">
+      <table class="w-full text-sm border">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="border p-2">Day</th>
+            <th class="border p-2">Front Desk</th>
+            <th class="border p-2">Housekeeping</th>
+            <th class="border p-2">Maintenance</th>
+            <th class="border p-2">F&B</th>
+          </tr>
+        </thead>
+        <tbody id="scheduleBody"></tbody>
+      </table>
+    </div>
+    <button id="pdfBtn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Download PDF</button>
+  </div>
+
+  <script>
+    const days = ["Friday","Saturday","Sunday","Monday","Tuesday","Wednesday","Thursday"];
+    const scheduleBody = document.getElementById('scheduleBody');
+    days.forEach(day=>{
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td class="border p-2 font-medium">${day}</td>
+        ${["Front Desk","Housekeeping","Maintenance","F&B"].map(d =>
+          `<td class='border p-1'><input class='w-full p-1 border rounded' placeholder='Names'></td>`
+        ).join('')}
+      `;
+      scheduleBody.appendChild(row);
+    });
+
+    // Tabs toggle
+    const metricsTab = document.getElementById('metricsTab');
+    const scheduleTab = document.getElementById('scheduleTab');
+    document.getElementById('tabMetrics').onclick = () => {
+      metricsTab.classList.remove('hidden');
+      scheduleTab.classList.add('hidden');
+      document.getElementById('tabMetrics').classList.replace('bg-gray-200','bg-blue-600');
+      document.getElementById('tabMetrics').classList.replace('text-gray-800','text-white');
+      document.getElementById('tabSchedule').classList.replace('bg-blue-600','bg-gray-200');
+      document.getElementById('tabSchedule').classList.replace('text-white','text-gray-800');
+    };
+    document.getElementById('tabSchedule').onclick = () => {
+      metricsTab.classList.add('hidden');
+      scheduleTab.classList.remove('hidden');
+      document.getElementById('tabSchedule').classList.replace('bg-gray-200','bg-blue-600');
+      document.getElementById('tabSchedule').classList.replace('text-gray-800','text-white');
+      document.getElementById('tabMetrics').classList.replace('bg-blue-600','bg-gray-200');
+      document.getElementById('tabMetrics').classList.replace('text-white','text-gray-800');
+    };
+
+    // Revenue calculation
+    document.querySelectorAll('#roomsSold, #adr').forEach(el=>{
+      el.addEventListener('input',()=>{
+        const rooms = parseFloat(document.getElementById('roomsSold').value) || 0;
+        const adr = parseFloat(document.getElementById('adr').value) || 0;
+        const revenue = rooms * adr;
+        document.getElementById('revenueDisplay').innerText = `Revenue: $${revenue.toFixed(2)}`;
+      });
+    });
+
+    // PDF Export
+    document.getElementById('pdfBtn').onclick = () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const revenue = document.getElementById('revenueDisplay').innerText;
+      doc.text("HotelOps Weekly Summary", 10, 10);
+      doc.text(revenue, 10, 20);
+      doc.text("Schedule:", 10, 30);
+
+      let y = 40;
+      const rows = scheduleBody.querySelectorAll('tr');
+      rows.forEach(r=>{
+        const cells = [...r.querySelectorAll('td')].map(td => td.querySelector('input')?.value || td.innerText);
+        doc.text(cells.join(" | "), 10, y);
+        y += 8;
+      });
+
+      doc.save("HotelOps_Weekly_Summary.pdf");
+    };
+  </script>
+</body>
+</html>
